@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Persita Colors (Purple & Gold) -->
+    <color name="primary">#7B3F9E</color> <!-- Purple Persita -->
+    <color name="primary_dark">#5E2E7A</color> <!-- Darker Purple -->
+    <color name="primary_light">#E8D5F1</color> <!-- Light Purple -->
+    <color name="accent">#FFB300</color> <!-- Gold Persita -->
+    <color name="success">#4CAF50</color>
+    <color name="error">#F44336</color>
+    <color name="warning">#FF9800</color>
+
+    <color name="text_primary">#212121</color>
+    <color name="text_secondary">#757575</color>
+    <color name="divider">#BDBDBD</color>
+
+    <!-- Background colors -->
+    <color name="background_success">#E8F5E9</color>
+    <color name="background_error">#FFEBEE</color>
+    <color name="background_warning">#FFF3E0</color>
+
+    <!-- Default Theme Colors (Required) -->
+    <color name="purple_200">#FFBB86FC</color>
+    <color name="purple_500">#7B3F9E</color>
+    <color name="purple_700">#5E2E7A</color>
+    <color name="teal_200">#FF03DAC5</color>
+    <color name="teal_700">#FF018786</color>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+
+    <color name="success_green">#4CAF50</color>
+    <color name="error_red">#F44336</color>
+</resources>
