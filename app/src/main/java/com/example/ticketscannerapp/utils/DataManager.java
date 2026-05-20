@@ -27,7 +27,7 @@ public class DataManager {
     private static DataManager instance;
     private final Map<String, Ticket> ticketDatabase;
     private String checkInListId = "cil_e2CqWkS3Tvyso";
-    private String authToken;
+    private String authToken; // format "token=<jwt>", sama seperti browser
 
     public interface DataLoadCallback {
         void onSuccess(List<Ticket> tickets);
@@ -50,6 +50,10 @@ public class DataManager {
         return instance;
     }
 
+    /**
+     * Set token dalam format Cookie: "token=<jwt>"
+     * Panggil dengan raw token saja — prefix ditambahkan di sini.
+     */
     public void setAuthToken(String token) {
         this.authToken = "token=" + token;
     }
@@ -58,7 +62,8 @@ public class DataManager {
         this.checkInListId = listId;
     }
 
-    // Load attendees dari API
+    // ─── Load attendees dari API ──────────────────────────────────────────────
+
     public void loadAttendeesFromAPI(final DataLoadCallback callback) {
         if (authToken == null) {
             callback.onError("Token tidak tersedia");
@@ -107,7 +112,8 @@ public class DataManager {
         });
     }
 
-    // Check-in via API
+    // ─── Check-in via API ─────────────────────────────────────────────────────
+
     public void checkInTicketAPI(final String ticketId, final CheckInCallback callback) {
         Ticket ticket = getTicket(ticketId);
 
@@ -158,6 +164,8 @@ public class DataManager {
             }
         });
     }
+
+    // ─── Database helpers ─────────────────────────────────────────────────────
 
     public synchronized void addTicketToDatabase(Ticket ticket) {
         if (ticket != null && ticket.getTicketId() != null) {

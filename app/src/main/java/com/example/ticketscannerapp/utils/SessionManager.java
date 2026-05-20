@@ -15,6 +15,9 @@ public class SessionManager {
     private static final String KEY_ACCOUNT_ID = "accountId";
     private static final String KEY_ACCOUNT_NAME = "accountName";
 
+    // Key untuk gate yang dipilih operator saat login
+    private static final String KEY_GATE_NAME = "gateName";
+
     private SharedPreferences prefs;
     private SharedPreferences.Editor editor;
     private Context context;
@@ -34,6 +37,10 @@ public class SessionManager {
         editor.putString(KEY_ROLE, user.getRole());
         editor.putInt(KEY_ACCOUNT_ID, user.getAccountId());
         editor.putString(KEY_ACCOUNT_NAME, user.getAccountName());
+
+        // Simpan gate yang dipilih operator (Gate 1 - Gate 10, VIP Utara, VIP Selatan, VVIP)
+        editor.putString(KEY_GATE_NAME, user.getGateName());
+
         editor.apply();
     }
 
@@ -67,6 +74,15 @@ public class SessionManager {
 
     public String getAccountName() {
         return prefs.getString(KEY_ACCOUNT_NAME, null);
+    }
+
+    /**
+     * Mengembalikan gate yang dipilih operator saat login.
+     * Contoh: "Gate 1", "VIP Utara", "VVIP"
+     * Digunakan oleh SyncManager saat mengirim batch check-in ke server.
+     */
+    public String getGateName() {
+        return prefs.getString(KEY_GATE_NAME, null);
     }
 
     public void logout() {

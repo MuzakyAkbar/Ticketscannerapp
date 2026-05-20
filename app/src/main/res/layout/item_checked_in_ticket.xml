@@ -4,8 +4,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginStart="16dp"
-    android:layout_marginEnd="16dp"
+    android:layout_marginHorizontal="16dp"
     android:layout_marginTop="8dp"
     app:cardCornerRadius="12dp"
     app:cardElevation="3dp"
@@ -14,72 +13,78 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
+        android:orientation="horizontal"
         android:padding="16dp">
 
+        <!-- Status Indicator -->
+        <View
+            android:id="@+id/viewStatus"
+            android:layout_width="6dp"
+            android:layout_height="match_parent"
+            android:background="@color/success_green"
+            android:layout_marginEnd="12dp"/>
+
         <LinearLayout
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:orientation="horizontal">
+            android:layout_weight="1"
+            android:orientation="vertical">
 
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical">
-
-                <TextView
-                    android:id="@+id/tvName"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Nama"
-                    android:textSize="16sp"
-                    android:textStyle="bold"
-                    android:textColor="@color/text_primary" />
-
-                <TextView
-                    android:id="@+id/tvTicketId"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="ID"
-                    android:textSize="12sp"
-                    android:textColor="@color/text_secondary"
-                    android:layout_marginTop="2dp" />
-
-            </LinearLayout>
-
+            <!-- Name -->
             <TextView
-                android:id="@+id/tvType"
+                android:id="@+id/tvName"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="VIP"
-                android:textSize="11sp"
+                android:text="Nama Peserta"
+                android:textSize="16sp"
                 android:textStyle="bold"
-                android:textColor="@color/primary"
-                android:background="@drawable/bg_badge"
-                android:paddingStart="10dp"
-                android:paddingEnd="10dp"
-                android:paddingTop="6dp"
-                android:paddingBottom="6dp"
-                android:layout_gravity="center_vertical" />
+                android:textColor="@color/text_primary"/>
+
+            <!-- Email -->
+            <TextView
+                android:id="@+id/tvEmail"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="email@example.com"
+                android:textSize="12sp"
+                android:textColor="@color/text_secondary"
+                android:layout_marginTop="2dp"/>
+
+            <!-- Ticket ID -->
+            <TextView
+                android:id="@+id/tvTicketId"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Ticket ID: ABC123"
+                android:textSize="12sp"
+                android:textColor="@color/text_secondary"
+                android:layout_marginTop="2dp"/>
+
+            <!-- Checkin Time -->
+            <TextView
+                android:id="@+id/tvCheckInTime"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Checked-in: 12:00:00"
+                android:textSize="12sp"
+                android:textColor="@color/success_green"
+                android:layout_marginTop="6dp"/>
 
         </LinearLayout>
 
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="@color/divider"
-            android:layout_marginTop="10dp"
-            android:layout_marginBottom="10dp" />
-
+        <!-- Ticket Type -->
         <TextView
-            android:id="@+id/tvTime"
+            android:id="@+id/tvType"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="✓ 12:00:00"
-            android:textSize="12sp"
-            android:textColor="@color/success"
-            android:drawablePadding="4dp" />
+            android:text="VIP"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:textColor="@color/primary"
+            android:background="@drawable/bg_badge"
+            android:paddingHorizontal="10dp"
+            android:paddingVertical="6dp"
+            android:layout_gravity="center_vertical"/>
 
     </LinearLayout>
 

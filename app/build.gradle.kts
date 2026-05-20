@@ -32,21 +32,30 @@ android {
 }
 
 dependencies {
-    // UI Libraries
+    // AndroidX Core Libraries
     implementation(libs.appcompat)
     implementation(libs.material)
     implementation(libs.constraintlayout)
 
-    // Networking - pakai tanda kurung () untuk Kotlin DSL
+    // Networking Libraries
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
-    implementation("com.google.mlkit:barcode-scanning:17.2.0")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
-    // Helper Libraries
-    implementation(libs.gson)
-    implementation(libs.okhttp)
-    implementation(libs.zxing.embedded)
+    // JSON Processing
+    implementation("com.google.code.gson:gson:2.10.1")
+
+    // Barcode/QR Scanning
+    implementation("com.google.mlkit:barcode-scanning:17.2.0")
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+
+    // RecyclerView & CardView
+    implementation("androidx.recyclerview:recyclerview:1.3.2")
+    implementation("androidx.cardview:cardview:1.0.0")
+
+    // SwipeRefreshLayout (jika diperlukan)
+    implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
 
     // Unit Testing
     testImplementation(libs.junit)
