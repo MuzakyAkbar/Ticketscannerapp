@@ -138,7 +138,7 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:hint="URL / short ID / scan QR"
-                            android:inputType="text"
+                            android:inputType="textVisiblePassword"
                             android:imeOptions="actionDone"
                             android:maxLines="1" />
                     </com.google.android.material.textfield.TextInputLayout>
@@ -159,6 +159,30 @@
 
                 </LinearLayout>
 
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="37dp"
+                    android:layout_marginBottom="4dp"
+                    android:gravity="end"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnClearUrl"
+                        style="@style/Widget.MaterialComponents.Button.TextButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="match_parent"
+                        android:paddingStart="4dp"
+                        android:paddingEnd="8dp"
+                        android:text="Hapus URL"
+                        android:textColor="@color/error"
+                        android:textSize="11sp"
+                        app:icon="@drawable/ic_close"
+                        app:iconPadding="4dp"
+                        app:iconSize="14dp"
+                        app:iconTint="@color/error" />
+
+                </LinearLayout>
+
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
@@ -166,6 +190,27 @@
                     android:textSize="11sp"
                     android:textColor="@color/text_secondary"
                     android:layout_marginBottom="16dp" />
+
+                <!-- Scan Mode Selection Dropdown -->
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/tilScanMode"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="Pilih Opsi"
+                    style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+                    app:startIconDrawable="@drawable/ic_qr_code"
+                    android:layout_marginBottom="16dp">
+
+                    <AutoCompleteTextView
+                        android:id="@+id/spinnerScanMode"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="none"
+                        android:focusable="false"
+                        android:focusableInTouchMode="false"
+                        android:cursorVisible="false" />
+
+                </com.google.android.material.textfield.TextInputLayout>
 
                 <!-- Gate Selection Dropdown -->
                 <com.google.android.material.textfield.TextInputLayout

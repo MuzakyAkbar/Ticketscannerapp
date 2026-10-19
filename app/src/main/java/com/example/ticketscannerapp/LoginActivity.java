@@ -39,20 +39,31 @@ public class LoginActivity extends AppCompatActivity {
     private static final String PREF_PASSWORD = "SavedPassword";
     private static final String PREF_CHECK_IN_URL = "SavedCheckInUrl";
     private static final String PREF_GATE = "SavedGate";
+    private static final String PREF_SCAN_MODE = "SavedScanMode";
     private static final String PREF_NAME = "CheckInPrefs";
+
+    // Scan mode options
+    private static final String[] SCAN_MODE_LIST = {
+            "Check-In", "Check-Ticket"
+    };
 
     // Daftar gate yang tersedia
     private static final String[] GATE_LIST = {
             "Gate 1", "Gate 2", "Gate 3", "Gate 4", "Gate 5",
             "Gate 6", "Gate 7", "Gate 8", "Gate 9", "Gate 10",
+            "Gate 11", "Gate 12", "Gate 13", "Gate 14", "Gate 15",
+            "Gate 16", "Gate 17", "Gate 18",
             "VIP Utara", "VIP Selatan", "VVIP"
     };
 
     private TextInputEditText etUsername, etPassword, etCheckInUrl;
     private MaterialButton btnScanQr;
+    private MaterialButton btnClearUrl;
     private MaterialButton btnLogin;
     private CheckBox cbRememberMe;
+    private AutoCompleteTextView spinnerScanMode;
     private AutoCompleteTextView spinnerGate;
+    private com.google.android.material.textfield.TextInputLayout tilGate;
     private SessionManager sessionManager;
     private SharedPreferences prefs;
     private SharedPreferences checkInPrefs;
@@ -84,7 +95,29 @@ public class LoginActivity extends AppCompatActivity {
         btnLogin = findViewById(R.id.btnLogin);
         cbRememberMe = findViewById(R.id.cbRememberMe);
         btnScanQr = findViewById(R.id.btnScanQr);
+        btnClearUrl = findViewById(R.id.btnClearUrl);
+        spinnerScanMode = findViewById(R.id.spinnerScanMode);
         spinnerGate = findViewById(R.id.spinnerGate);
+        tilGate = findViewById(R.id.tilGate);
+
+        // Setup scan mode dropdown adapter
+        ArrayAdapter<String> scanModeAdapter = new ArrayAdapter<>(
+                this,
+                android.R.layout.simple_dropdown_item_1line,
+                SCAN_MODE_LIST
+        );
+        spinnerScanMode.setAdapter(scanModeAdapter);
+
+        // Show/hide gate based on scan mode selection
+        spinnerScanMode.setOnItemClickListener((parent, view, position, id) -> {
+            String selected = SCAN_MODE_LIST[position];
+            if ("Check-Ticket".equals(selected)) {
+                tilGate.setVisibility(android.view.View.GONE);
+                spinnerGate.setText("", false);
+            } else {
+                tilGate.setVisibility(android.view.View.VISIBLE);
+            }
+        });
 
         // Setup gate dropdown adapter
         ArrayAdapter<String> gateAdapter = new ArrayAdapter<>(
@@ -108,10 +141,29 @@ public class LoginActivity extends AppCompatActivity {
             String savedCheckInUrl = prefs.getString(PREF_CHECK_IN_URL, "");
             String savedGate = prefs.getString(PREF_GATE, "");
 
+            String savedScanMode = prefs.getString(PREF_SCAN_MODE, "");
+
             etUsername.setText(savedEmail);
             etPassword.setText(savedPassword);
             etCheckInUrl.setText(savedCheckInUrl);
             cbRememberMe.setChecked(true);
+
+            // Restore base URL ke ApiClient dari URL yang tersimpan
+            if (!savedCheckInUrl.isEmpty()) {
+                String savedBaseUrl = extractBaseUrl(savedCheckInUrl);
+                if (savedBaseUrl != null) ApiClient.setBaseUrl(savedBaseUrl);
+            }
+
+            // Restore scan mode selection
+            if (!savedScanMode.isEmpty()) {
+                spinnerScanMode.setText(savedScanMode, false);
+                // Apply gate visibility based on restored mode
+                if ("Check-Ticket".equals(savedScanMode)) {
+                    tilGate.setVisibility(android.view.View.GONE);
+                } else {
+                    tilGate.setVisibility(android.view.View.VISIBLE);
+                }
+            }
 
             // Restore gate selection — false agar tidak trigger filter dropdown
             if (!savedGate.isEmpty()) {
@@ -120,7 +172,7 @@ public class LoginActivity extends AppCompatActivity {
         }
     }
 
-    private void saveCredentials(String email, String password, String checkInUrl, String gate) {
+    private void saveCredentials(String email, String password, String checkInUrl, String gate, String scanMode) {
         SharedPreferences.Editor editor = prefs.edit();
 
         if (cbRememberMe.isChecked()) {
@@ -129,12 +181,14 @@ public class LoginActivity extends AppCompatActivity {
             editor.putString(PREF_PASSWORD, password);
             editor.putString(PREF_CHECK_IN_URL, checkInUrl);
             editor.putString(PREF_GATE, gate);
+            editor.putString(PREF_SCAN_MODE, scanMode);
         } else {
             editor.putBoolean(PREF_REMEMBER, false);
             editor.remove(PREF_EMAIL);
             editor.remove(PREF_PASSWORD);
             editor.remove(PREF_CHECK_IN_URL);
             editor.remove(PREF_GATE);
+            editor.remove(PREF_SCAN_MODE);
         }
 
         editor.apply();
@@ -142,6 +196,13 @@ public class LoginActivity extends AppCompatActivity {
 
     private void setupListeners() {
         btnLogin.setOnClickListener(v -> handleLogin());
+
+        if (btnClearUrl != null) {
+            btnClearUrl.setOnClickListener(v -> {
+                etCheckInUrl.setText("");
+                etCheckInUrl.requestFocus();
+            });
+        }
 
         // Kamera QR scan
         if (btnScanQr != null) {
@@ -166,6 +227,7 @@ public class LoginActivity extends AppCompatActivity {
         String email = etUsername.getText().toString().trim();
         String password = etPassword.getText().toString().trim();
         String checkInUrl = etCheckInUrl.getText().toString().trim();
+        String selectedScanMode = spinnerScanMode.getText().toString().trim();
         String selectedGate = spinnerGate.getText().toString().trim();
 
         // Validate inputs
@@ -184,24 +246,46 @@ public class LoginActivity extends AppCompatActivity {
             return;
         }
 
-        // Validate gate selection
-        if (selectedGate.isEmpty()) {
-            spinnerGate.setError("Pilih gate terlebih dahulu");
-            Toast.makeText(this, "Pilih gate terlebih dahulu", Toast.LENGTH_SHORT).show();
+        // Validate scan mode selection
+        if (selectedScanMode.isEmpty()) {
+            spinnerScanMode.setError("Pilih opsi terlebih dahulu");
+            Toast.makeText(this, "Pilih opsi: Check-In atau Check-Ticket", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        // Validate gate value against known list
-        boolean validGate = false;
-        for (String gate : GATE_LIST) {
-            if (gate.equals(selectedGate)) {
-                validGate = true;
+        boolean validMode = false;
+        for (String mode : SCAN_MODE_LIST) {
+            if (mode.equals(selectedScanMode)) {
+                validMode = true;
                 break;
             }
         }
-        if (!validGate) {
-            spinnerGate.setError("Gate tidak valid");
+        if (!validMode) {
+            spinnerScanMode.setError("Opsi tidak valid");
             return;
+        }
+
+        // Validate gate selection — hanya wajib untuk mode Check-In
+        boolean isCheckTicketMode = "Check-Ticket".equals(selectedScanMode);
+        if (!isCheckTicketMode) {
+            if (selectedGate.isEmpty()) {
+                spinnerGate.setError("Pilih gate terlebih dahulu");
+                Toast.makeText(this, "Pilih gate terlebih dahulu", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            // Validate gate value against known list
+            boolean validGate = false;
+            for (String gate : GATE_LIST) {
+                if (gate.equals(selectedGate)) {
+                    validGate = true;
+                    break;
+                }
+            }
+            if (!validGate) {
+                spinnerGate.setError("Gate tidak valid");
+                return;
+            }
         }
 
         // Extract short_id from URL
@@ -213,14 +297,23 @@ public class LoginActivity extends AppCompatActivity {
         }
 
         // Save credentials if Remember Me is checked
-        saveCredentials(email, password, checkInUrl, selectedGate);
+        saveCredentials(email, password, checkInUrl, selectedGate, selectedScanMode);
 
         // Show loading
         btnLogin.setEnabled(false);
         btnLogin.setText("Logging in...");
 
+        // Extract base URL dari input (misal: https://dev1.pirantisolusi.com/ci/cil_xxx → https://dev1.pirantisolusi.com)
+        String baseUrl = extractBaseUrl(checkInUrl);
+        if (baseUrl == null) {
+            etCheckInUrl.setError("Invalid Check-In URL");
+            Toast.makeText(this, "Tidak dapat menentukan base URL dari input", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        ApiClient.setBaseUrl(baseUrl);
+
         // Step 1: Login with API
-        performLogin(email, password, shortId, selectedGate);
+        performLogin(email, password, shortId, selectedGate, selectedScanMode);
     }
 
     private void startQrScan() {
@@ -248,6 +341,27 @@ public class LoginActivity extends AppCompatActivity {
         }
     }
 
+    private String extractBaseUrl(String input) {
+        if (input == null || input.isEmpty()) return null;
+        input = input.trim();
+        try {
+            // Kalau hanya short_id (cil_xxx), tidak bisa extract base URL
+            if (input.startsWith("cil_")) return null;
+
+            // Ambil scheme + host, buang path
+            // contoh: https://dev1.pirantisolusi.com/ci/cil_xxx → https://dev1.pirantisolusi.com
+            int schemeEnd = input.indexOf("://");
+            if (schemeEnd < 0) return null;
+            String afterScheme = input.substring(schemeEnd + 3); // "dev1.pirantisolusi.com/ci/cil_xxx"
+            int slashIdx = afterScheme.indexOf("/");
+            String host = slashIdx >= 0 ? afterScheme.substring(0, slashIdx) : afterScheme;
+            return input.substring(0, schemeEnd + 3) + host; // "https://dev1.pirantisolusi.com"
+        } catch (Exception e) {
+            Log.e(TAG, "Error extracting base URL", e);
+            return null;
+        }
+    }
+
     private String extractShortId(String input) {
         if (input == null || input.isEmpty()) return null;
         input = input.trim();
@@ -271,7 +385,7 @@ public class LoginActivity extends AppCompatActivity {
         return input;
     }
 
-    private void performLogin(String email, String password, String shortId, String selectedGate) {
+    private void performLogin(String email, String password, String shortId, String selectedGate, String selectedScanMode) {
         LoginRequest loginRequest = new LoginRequest(email, password);
 
         ApiClient.getApiService().login(loginRequest).enqueue(new Callback<LoginResponse>() {
@@ -285,7 +399,7 @@ public class LoginActivity extends AppCompatActivity {
                         saveUserSession(loginResponse, selectedGate);
 
                         // Step 2: Validate check-in list
-                        validateCheckInList(shortId, selectedGate);
+                        validateCheckInList(shortId, selectedGate, selectedScanMode);
                     } else {
                         resetLoginButton();
                         Toast.makeText(LoginActivity.this,
@@ -343,7 +457,7 @@ public class LoginActivity extends AppCompatActivity {
         Log.d(TAG, "User session saved with gate: " + selectedGate);
     }
 
-    private void validateCheckInList(String shortId, String selectedGate) {
+    private void validateCheckInList(String shortId, String selectedGate, String selectedScanMode) {
         ApiService apiService = ApiClient.getApiService();
 
         apiService.getCheckInListDetail(shortId).enqueue(new Callback<CheckInListDetailResponse>() {
@@ -369,7 +483,7 @@ public class LoginActivity extends AppCompatActivity {
                             return;
                         }
 
-                        saveCheckInListInfo(detail, selectedGate);
+                        saveCheckInListInfo(detail, selectedGate, selectedScanMode);
 
                         Toast.makeText(LoginActivity.this,
                                 "Login berhasil! Gate: " + selectedGate + " — " + detail.getName(),
@@ -402,12 +516,14 @@ public class LoginActivity extends AppCompatActivity {
         });
     }
 
-    private void saveCheckInListInfo(CheckInListDetailResponse.CheckInListDetail detail, String selectedGate) {
+    private void saveCheckInListInfo(CheckInListDetailResponse.CheckInListDetail detail, String selectedGate, String selectedScanMode) {
         SharedPreferences.Editor editor = checkInPrefs.edit();
         editor.putString("check_in_list_id", detail.getShortId());
         editor.putString("check_in_list_name", detail.getName());
         // Simpan gate ke CheckInPrefs agar bisa diakses oleh SyncManager
         editor.putString("selected_gate", selectedGate);
+        // Simpan scan mode: "Check-In" atau "Check-Ticket"
+        editor.putString("scan_mode", selectedScanMode);
 
         if (detail.getEvent() != null) {
             editor.putString("event_name", detail.getEvent().getTitle());

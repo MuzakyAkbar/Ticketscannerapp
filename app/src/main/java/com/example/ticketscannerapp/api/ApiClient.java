@@ -16,12 +16,31 @@ import retrofit2.Retrofit;
 import retrofit2.converter.gson.GsonConverterFactory;
 
 public class ApiClient {
-    private static final String BASE_URL = "https://dev1.pirantisolusi.com/";
-    private static final String BASE_ORIGIN = "https://dev1.pirantisolusi.com";
     private static final String TAG = "ApiClient";
     private static Retrofit retrofit = null;
+    private static String currentBaseUrl = null;
+    private static String currentBaseOrigin = null;
+
+    /** Dipanggil dari LoginActivity sebelum request pertama */
+    public static boolean isBaseUrlSet() {
+        return currentBaseUrl != null;
+    }
+
+    public static void setBaseUrl(String baseUrl) {
+        String normalized = baseUrl.endsWith("/") ? baseUrl : baseUrl + "/";
+        if (!normalized.equals(currentBaseUrl)) {
+            currentBaseUrl = normalized;
+            // Hilangkan trailing slash untuk Origin/Referer
+            currentBaseOrigin = normalized.replaceAll("/$", "");
+            retrofit = null; // reset agar dibuat ulang dengan URL baru
+        }
+    }
 
     public static Retrofit getClient() {
+        if (currentBaseUrl == null) {
+            throw new IllegalStateException("ApiClient: base URL belum di-set. Panggil setBaseUrl() dulu.");
+        }
+
         if (retrofit == null) {
             HttpLoggingInterceptor interceptor = new HttpLoggingInterceptor();
             interceptor.setLevel(HttpLoggingInterceptor.Level.BODY);
@@ -37,12 +56,12 @@ public class ApiClient {
                 Request original = chain.request();
 
                 // Bangun Referer dari path request yang sedang dikirim
-                String referer = BASE_ORIGIN + original.url().encodedPath();
+                String referer = currentBaseOrigin + original.url().encodedPath();
 
                 Request request = original.newBuilder()
                         .header("Accept", "application/json, text/plain, */*")
                         .header("X-Requested-With", "XMLHttpRequest")
-                        .header("Origin", BASE_ORIGIN)
+                        .header("Origin", currentBaseOrigin)
                         .header("Referer", referer)
                         .method(original.method(), original.body())
                         .build();
@@ -84,11 +103,10 @@ public class ApiClient {
 
             Gson gson = new GsonBuilder()
                     .setLenient()
-                    .serializeNulls()
                     .create();
 
             retrofit = new Retrofit.Builder()
-                    .baseUrl(BASE_URL)
+                    .baseUrl(currentBaseUrl)
                     .client(client)
                     .addConverterFactory(GsonConverterFactory.create(gson))
                     .build();

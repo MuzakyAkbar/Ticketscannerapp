@@ -24,6 +24,8 @@ import com.example.ticketscannerapp.utils.SyncManager;
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.textfield.TextInputEditText;
+import com.google.zxing.integration.android.IntentIntegrator;
+import com.google.zxing.integration.android.IntentResult;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -41,6 +43,8 @@ public class MainActivity extends AppCompatActivity {
     private TextView tvGateName, tvOperator, tvCheckedIn, tvTotalTickets, tvLastSync, tvSyncStatus;
     private TextInputEditText etTicketId;
     private MaterialButton btnManualScan;
+    private MaterialButton btnCameraScan;
+    private MaterialButton btnManualSync;
     private CardView cardBannerContainer;
 
     private LocalAttendeeDatabase localDb;
@@ -49,6 +53,7 @@ public class MainActivity extends AppCompatActivity {
     private String checkInListId;
     private String checkInListName;
     private String selectedGate;
+    private String scanMode;
     private Runnable hideBannerRunnable;
     private final Handler scanHandler = new Handler(Looper.getMainLooper());
     private Runnable scanRunnable;
@@ -63,6 +68,7 @@ public class MainActivity extends AppCompatActivity {
         checkInListId = prefs.getString("check_in_list_id", null);
         checkInListName = prefs.getString("check_in_list_name", "Check-In Gate");
         selectedGate = prefs.getString("selected_gate", "Unknown Gate");
+        scanMode = prefs.getString("scan_mode", "Check-In");
 
         if (checkInListId == null) {
             navigateToLogin();
@@ -106,17 +112,34 @@ public class MainActivity extends AppCompatActivity {
         tvLastSync = findViewById(R.id.tvLastSync);
         etTicketId = findViewById(R.id.etTicketId);
         btnManualScan = findViewById(R.id.btnManualScan);
+        btnCameraScan = findViewById(R.id.btnCameraScan);
+        btnManualSync = findViewById(R.id.btnManualSync);
         cardBannerContainer = findViewById(R.id.cardBannerContainer);
 
+        boolean isCheckTicket = "Check-Ticket".equals(scanMode);
+
         if (tvGateName != null) {
-            tvGateName.setText(selectedGate);
+            if (isCheckTicket) {
+                tvGateName.setText("Mode: Check-Ticket");
+            } else {
+                tvGateName.setText(selectedGate + "  \u00b7  " + scanMode);
+            }
         }
 
         if (tvOperator != null) {
             tvOperator.setText(checkInListName + "  |  " + checkInListId);
         }
 
-        setSupportActionBar(toolbar);
+        // Mode Check-Ticket: sembunyikan tombol lihat list
+        if (btnViewList != null) {
+            btnViewList.setVisibility(isCheckTicket ? android.view.View.GONE : android.view.View.VISIBLE);
+        }
+
+        // Ubah label tombol manual sesuai mode
+        if (btnManualScan != null) {
+            btnManualScan.setText(isCheckTicket ? "Cek Ticket" : "Manual Check In");
+        }
+       // setSupportActionBar(toolbar); //ini nanti untuk perangkat baru ga dipakai
     }
 
     private void setupListeners() {
@@ -131,8 +154,27 @@ public class MainActivity extends AppCompatActivity {
             btnLogout.setOnClickListener(v -> logout());
         }
 
+        if (btnCameraScan != null) {
+            btnCameraScan.setOnClickListener(v -> startCameraScan());
+        }
+
         if (btnManualScan != null) {
             btnManualScan.setOnClickListener(v -> processTicket());
+        }
+
+        if (btnManualSync != null) {
+            btnManualSync.setOnClickListener(v -> {
+                if (syncManager != null) {
+                    btnManualSync.setEnabled(false);
+                    btnManualSync.setText("Syncing...");
+                    syncManager.triggerSyncNow();
+                    // Re-enable setelah 3 detik
+                    new Handler().postDelayed(() -> {
+                        btnManualSync.setEnabled(true);
+                        btnManualSync.setText("Sync");
+                    }, 3000);
+                }
+            });
         }
 
         if (etTicketId != null) {
@@ -241,13 +283,29 @@ public class MainActivity extends AppCompatActivity {
 
         if (attendee == null) {
             Log.d(SCAN_DEBUG, "Attendee NOT FOUND for: [" + ticketId + "]");
-            showError("Ticket tidak ditemukan: " + ticketId);
+            if ("Check-Ticket".equals(scanMode)) {
+                showCheckTicketResult("not_found");
+            } else {
+                showError("Ticket tidak ditemukan: " + ticketId);
+            }
             resetInput();
             return;
         }
 
         Log.d(SCAN_DEBUG, "Attendee FOUND: " + attendee.getFullName() + " | isCheckedIn=" + attendee.isCheckedIn);
 
+        if ("Check-Ticket".equals(scanMode)) {
+            // Mode check-ticket: hanya tampilkan status, tidak ubah data sama sekali
+            if (attendee.isCheckedIn) {
+                showCheckTicketResult("already");
+            } else {
+                showCheckTicketResult("valid");
+            }
+            resetInput();
+            return;
+        }
+
+        // Mode check-in: proses check-in normal
         if (attendee.isCheckedIn) {
             showWarning("Ticket sudah di-check-in sebelumnya", attendee);
             resetInput();
@@ -255,7 +313,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         // Check-in locally, gate akan disertakan saat sync ke server
-        localDb.checkInLocal(ticketId);
+        localDb.checkInLocal(ticketId, selectedGate);
 
         showSuccess(attendee);
         resetInput();
@@ -267,6 +325,14 @@ public class MainActivity extends AppCompatActivity {
             if (cardBannerContainer != null) {
                 com.example.ticketscannerapp.models.Ticket ticket = convertToTicket(attendee);
                 showBanner(() -> BannerHelper.showSuccessBanner(this, cardBannerContainer, ticket));
+            }
+        });
+    }
+
+    private void showCheckTicketResult(String state) {
+        runOnUiThread(() -> {
+            if (cardBannerContainer != null) {
+                showBanner(() -> BannerHelper.showCheckTicketBanner(this, cardBannerContainer, state));
             }
         });
     }
@@ -355,10 +421,38 @@ public class MainActivity extends AppCompatActivity {
 
     private void logout() {
         syncManager.stopSync();
-        localDb.clearAll();
         sessionManager.logout();
         getSharedPreferences(PREF_NAME, MODE_PRIVATE).edit().clear().apply();
         navigateToLogin();
+    }
+
+    private void startCameraScan() {
+        IntentIntegrator integrator = new IntentIntegrator(this);
+        integrator.setDesiredBarcodeFormats(IntentIntegrator.QR_CODE, IntentIntegrator.CODE_128, IntentIntegrator.CODE_39);
+        integrator.setPrompt("Arahkan kamera ke barcode / QR ticket");
+        integrator.setCameraId(0);
+        integrator.setBeepEnabled(true);
+        integrator.setBarcodeImageEnabled(false);
+        integrator.setOrientationLocked(false);
+        integrator.initiateScan();
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        IntentResult result = IntentIntegrator.parseActivityResult(requestCode, resultCode, data);
+        if (result != null) {
+            if (result.getContents() != null) {
+                String scanned = result.getContents().trim();
+                if (etTicketId != null) {
+                    etTicketId.setText(scanned);
+                }
+                // Langsung proses tanpa tunggu TextWatcher
+                cancelScanTimer();
+                processTicket();
+            }
+        } else {
+            super.onActivityResult(requestCode, resultCode, data);
+        }
     }
 
     private void navigateToLogin() {

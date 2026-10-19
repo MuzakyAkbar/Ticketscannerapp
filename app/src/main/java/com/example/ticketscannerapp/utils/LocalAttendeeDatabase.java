@@ -7,15 +7,15 @@ import com.google.gson.reflect.TypeToken;
 
 import java.lang.reflect.Type;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 public class LocalAttendeeDatabase {
     private static final String PREF_NAME = "LocalAttendeeDB";
     private static final String KEY_ATTENDEES = "attendees";
     private static final String KEY_PENDING_CHECKINS = "pending_checkins";
     private static final String KEY_PENDING_CHECKOUTS = "pending_checkouts";
+
+    private static final long NEW_FLAG_DURATION_MS = 5 * 60 * 1000L; // 5 menit
 
     private SharedPreferences prefs;
     private Gson gson;
@@ -37,9 +37,17 @@ public class LocalAttendeeDatabase {
         public String checkedInAt;
         public String checkInShortId;  // short_id dari check_in object (untuk checkout)
         public long localCheckInTime; // timestamp lokal untuk tracking
+        public String gate;            // gate tempat check-in dilakukan
+        public boolean isNew;          // flag: baru muncul dari server
+        public long newSince;          // timestamp kapan flag isNew di-set
 
         public String getFullName() {
             return (firstName != null ? firstName : "") + " " + (lastName != null ? lastName : "");
+        }
+
+        /** Cek apakah flag "baru" masih berlaku (dalam 5 menit) */
+        public boolean isStillNew() {
+            return isNew && (System.currentTimeMillis() - newSince) < NEW_FLAG_DURATION_MS;
         }
     }
 
@@ -58,11 +66,18 @@ public class LocalAttendeeDatabase {
         return gson.fromJson(json, type);
     }
 
+    /** Normalisasi ID: underscore → dash, uppercase. Agar A_B9A5E7B == A-B9A5E7B */
+    private String normalizeId(String id) {
+        if (id == null) return "";
+        return id.trim().replace('_', '-').toUpperCase();
+    }
+
     // Cari attendee berdasarkan public ID
     public LocalAttendee findAttendeeByPublicId(String publicId) {
+        String needle = normalizeId(publicId);
         List<LocalAttendee> attendees = getAttendees();
         for (LocalAttendee attendee : attendees) {
-            if (attendee.publicId.equals(publicId)) {
+            if (needle.equals(normalizeId(attendee.publicId))) {
                 return attendee;
             }
         }
@@ -70,12 +85,14 @@ public class LocalAttendeeDatabase {
     }
 
     // Check-in attendee secara lokal
-    public void checkInLocal(String publicId) {
+    public void checkInLocal(String publicId, String gate) {
+        String needle = normalizeId(publicId);
         List<LocalAttendee> attendees = getAttendees();
         for (LocalAttendee attendee : attendees) {
-            if (attendee.publicId.equals(publicId)) {
+            if (needle.equals(normalizeId(attendee.publicId))) {
                 attendee.isCheckedIn = true;
                 attendee.localCheckInTime = System.currentTimeMillis();
+                attendee.gate = gate;
                 break;
             }
         }
@@ -85,9 +102,10 @@ public class LocalAttendeeDatabase {
 
     // Check-out attendee secara lokal
     public void checkOutLocal(String publicId) {
+        String needle = normalizeId(publicId);
         List<LocalAttendee> attendees = getAttendees();
         for (LocalAttendee attendee : attendees) {
-            if (attendee.publicId.equals(publicId)) {
+            if (needle.equals(normalizeId(attendee.publicId))) {
                 attendee.isCheckedIn = false;
                 attendee.checkedInAt = null;
                 attendee.localCheckInTime = 0;

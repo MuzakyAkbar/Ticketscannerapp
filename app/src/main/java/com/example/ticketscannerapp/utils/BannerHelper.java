@@ -58,6 +58,46 @@ public class BannerHelper {
         playSound(activity, R.raw.warning);
     }
 
+    /**
+     * Mode Check-Ticket: tampilkan hasil sederhana tanpa ubah data.
+     * state: "valid"       → ✓ hijau  (ticket ada, belum check-in)
+     *        "already"     → ⚠ oranye (ticket ada, sudah check-in)
+     *        "not_found"   → ✗ merah  (ticket tidak ditemukan)
+     */
+    public static void showCheckTicketBanner(Activity activity, CardView container, String state) {
+        container.removeAllViews();
+        View bannerView = LayoutInflater.from(activity).inflate(R.layout.banner_check_ticket, container, true);
+
+        TextView tvIcon   = bannerView.findViewById(R.id.tvCheckTicketIcon);
+        TextView tvStatus = bannerView.findViewById(R.id.tvCheckTicketStatus);
+        TextView tvSub    = bannerView.findViewById(R.id.tvCheckTicketSub);
+
+        switch (state) {
+            case "valid":
+                tvIcon.setText("✓");
+                tvIcon.setTextColor(android.graphics.Color.parseColor("#4CAF50"));
+                tvStatus.setText("TIKET VALID");
+                tvSub.setText("Belum check-in");
+                playSound(activity, R.raw.success);
+                break;
+            case "already":
+                tvIcon.setText("⚠");
+                tvIcon.setTextColor(android.graphics.Color.parseColor("#FF9800"));
+                tvStatus.setText("SUDAH CHECK-IN");
+                tvSub.setText("Tiket ini sudah pernah check-in");
+                playSound(activity, R.raw.warning);
+                break;
+            case "not_found":
+            default:
+                tvIcon.setText("✗");
+                tvIcon.setTextColor(android.graphics.Color.parseColor("#F44336"));
+                tvStatus.setText("TIKET TIDAK VALID");
+                tvSub.setText("Tiket tidak ditemukan");
+                playSound(activity, R.raw.error);
+                break;
+        }
+    }
+
     private static void playSound(Activity activity, int soundResourceId) {
         try {
             MediaPlayer mp = MediaPlayer.create(activity, soundResourceId);

@@ -23,10 +23,10 @@ import retrofit2.Response;
 public class SyncManager {
 
     private static final String TAG = "SyncManager";
-    private static final int PER_PAGE = 200;
+    private static final int PER_PAGE = 1000;
     private static final String PREF_NAME = "CheckInPrefs";
 
-    public interface SyncListener { 
+    public interface SyncListener {
         void onSyncStart();
         void onSyncSuccess(int attendeesUpdated, int pendingSynced);
         void onSyncError(String error);
@@ -44,6 +44,8 @@ public class SyncManager {
     private SyncListener listener;
     private volatile boolean isSyncing = false;
     private volatile boolean isRunning = false;
+    // Akumulator untuk menampung semua attendee dari semua page sebelum di-merge
+    private final List<PublicAttendeesResponse.AttendeeData> accumulatedServerList = new ArrayList<>();
 
     public SyncManager(Context context, String checkInListId) {
         this.context = context.getApplicationContext();
@@ -64,6 +66,11 @@ public class SyncManager {
     public void stopSync() {
         isRunning = false;
         mainHandler.removeCallbacksAndMessages(null);
+    }
+
+    public void triggerSyncNow() {
+        mainHandler.removeCallbacksAndMessages(null);
+        triggerSync();
     }
 
     private void triggerSync() {
@@ -88,6 +95,13 @@ public class SyncManager {
         isSyncing = true;
 
         notifyStart();
+
+        // Pastikan base URL sudah di-set sebelum sync
+        if (!ApiClient.isBaseUrlSet()) {
+            Log.e(TAG, "Base URL belum di-set, aborting sync");
+            finishSync(false, "Base URL belum tersedia");
+            return;
+        }
 
         String cookie = getCookieToken();
         if (cookie == null) {
@@ -127,11 +141,11 @@ public class SyncManager {
                     .batchCheckIn(checkInListId, request, cookie)
                     .execute(); // blocking
 
-            if (response.isSuccessful()) {
+            if (response.isSuccessful() || response.code() == 409) {
                 for (String publicId : pending) {
                     localDb.removePendingCheckIn(publicId);
                 }
-                Log.d(TAG, "Check-in push success: " + pending.size());
+                Log.d(TAG, "Check-in push success (code=" + response.code() + "): " + pending.size());
             } else {
                 Log.e(TAG, "Check-in push failed: " + response.code());
             }
@@ -173,6 +187,11 @@ public class SyncManager {
     // ─── Step 3: Fetch Attendees (async, paginated) ───────────────────────────
 
     private void fetchAttendeesFromServer(int page, int totalFetched, String cookie) {
+        // Saat mulai page 1, siapkan akumulator kosong di background thread
+        if (page == 1) {
+            dbExecutor.execute(() -> accumulatedServerList.clear());
+        }
+
         ApiClient.getApiService().getPublicAttendees(
                 checkInListId, page, PER_PAGE, null, null, null, null
         ).enqueue(new Callback<PublicAttendeesResponse>() {
@@ -185,16 +204,20 @@ public class SyncManager {
                     List<PublicAttendeesResponse.AttendeeData> attendeeList = body.getData();
                     int newTotal = totalFetched + (attendeeList != null ? attendeeList.size() : 0);
 
-                    // Merge di background thread agar tidak blokir UI
                     dbExecutor.execute(() -> {
+                        // Akumulasi semua page sebelum merge ke lokal
                         if (attendeeList != null && !attendeeList.isEmpty()) {
-                            mergeAttendeesToLocal(attendeeList);
+                            accumulatedServerList.addAll(attendeeList);
                         }
 
                         if (body.hasNextPage()) {
+                            // Masih ada page berikutnya, lanjut fetch
                             fetchAttendeesFromServer(page + 1, newTotal, cookie);
                         } else {
-                            Log.d(TAG, "Fetch complete. Total: " + newTotal);
+                            // Semua page sudah terkumpul, baru merge sekaligus
+                            Log.d(TAG, "Fetch complete. Total: " + newTotal + " attendees across " + page + " page(s)");
+                            mergeAttendeesToLocal(accumulatedServerList);
+                            accumulatedServerList.clear();
                             finishSync(true, null);
                         }
                     });
@@ -226,8 +249,10 @@ public class SyncManager {
             notifyError(errorMsg);
         }
 
-        // Langsung mulai siklus sync berikutnya tanpa jeda
-        triggerSync();
+        // Tunggu 2 detik sebelum sync berikutnya
+        if (isRunning) {
+            mainHandler.postDelayed(this::triggerSync, 2_000);
+        }
     }
 
     // ─── Merge Attendees (dipanggil dari background thread) ───────────────────
@@ -245,6 +270,7 @@ public class SyncManager {
 
         for (PublicAttendeesResponse.AttendeeData serverAttendee : serverList) {
             LocalAttendeeDatabase.LocalAttendee local = localMap.get(serverAttendee.getPublicId());
+            boolean isNewAttendee = (local == null);
             if (local == null) local = new LocalAttendeeDatabase.LocalAttendee();
 
             local.id = serverAttendee.getId();
@@ -272,6 +298,12 @@ public class SyncManager {
                 local.isCheckedIn = false;
                 local.checkedInAt = null;
                 local.checkInShortId = null;
+            }
+
+            // Set flag isNew jika attendee baru pertama kali muncul dari server
+            if (isNewAttendee) {
+                local.isNew = true;
+                local.newSince = System.currentTimeMillis();
             }
 
             merged.add(local);

@@ -70,6 +70,29 @@
                 android:textColor="@color/success_green"
                 android:layout_marginTop="6dp"/>
 
+            <!-- Gate -->
+            <TextView
+                android:id="@+id/tvGate"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Gate: -"
+                android:textSize="12sp"
+                android:textColor="@color/text_secondary"
+                android:layout_marginTop="2dp"
+                android:visibility="gone"/>
+
+            <!-- Tombol Check-In Manual (hanya tampil jika belum check-in) -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnCheckIn"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:text="Check-In"
+                android:textSize="12sp"
+                android:layout_marginTop="8dp"
+                app:cornerRadius="8dp"
+                android:visibility="gone"
+                style="@style/Widget.MaterialComponents.Button"/>
+
         </LinearLayout>
 
         <!-- Ticket Type -->
